@@ -356,7 +356,7 @@ class Trainer(object):
     def save_model(self, save_criteria_score=None):
         t.save(self.model.state_dict(), self.path)
         logger.info(f"[*] SAVED: {self.path}")
-        epochs, steps  = self.get_saved_models_info()
+        epochs, steps = self.get_saved_models_info()
         
         if save_criteria_score is not None:
             if os.path.exists(os.path.join(self.args.model_dir,'checkpoint_tracker.dat')):
@@ -378,9 +378,9 @@ class Trainer(object):
                 del checkpoint_tracker[remove_key]
 
                 remove_epoch = remove_key.split("_")[0]
-                paths = glob(os.path.join(self.args.model_dir,f'*_epoch{remove_epoch}_*.pth'))
-                for path in paths:
-                    remove_file(path)
+                remove_step = remove_key.split("_")[1]
+                path = glob(os.path.join(self.args.model_dir, f'*_epoch{remove_epoch}_step{remove_step}.pth'))
+                remove_file(path)
 
             # save back the checkpointer tracker
             t.save(checkpoint_tracker, os.path.join(self.args.model_dir,'checkpoint_tracker.dat'))
@@ -394,26 +394,33 @@ class Trainer(object):
                 for path in paths:
                     remove_file(path)
 
-
     def get_saved_models_info(self):
-        paths = glob(os.path.join(self.args.model_dir, '*.pth'))
+        paths = glob.glob(os.path.join(self.args.model_dir, "*.pth"))
         paths.sort()
 
-        def get_numbers(items, delimiter, idx, replace_word, must_contain=''):
-            return list(set([int(
-                    name.split(delimiter)[idx].replace(replace_word, ''))
-                    for name in basenames if must_contain in name]))
-
-        basenames = [os.path.basename(path.rsplit('.', 1)[0]) for path in paths]
-        epochs = get_numbers(basenames, '_', 1, 'epoch')
-        steps = get_numbers(basenames, '_', 2, 'step', 'model')
+        epochs = []
+        steps = []
+        for path in paths:
+            epoch, step = self._get_save_model_info(path)
+            epochs.append(epoch)
+            steps.append(step)
 
         epochs.sort()
         steps.sort()
-
-
         return epochs, steps
-    
+
+    @staticmethod
+    def _get_saved_model_info(path):
+
+        def get_number(item, delimiter, idx, replace_word, must_contain=''):
+            if must_contain in item:
+                return int(item.split(delimiter)[idx].replace(replace_word, ''))
+
+        basename = os.path.basename(path.rsplit('.', 1)[0])
+        epoch = get_number(basename, "_", 1, "epoch")
+        step = get_number(basename, "_", 2, "step", "model")
+
+        return epoch, step
 
 
 
@@ -423,6 +430,8 @@ class Trainer(object):
             map_location=None
             self.model.load_state_dict(
                 t.load(self.args.load_path, map_location=map_location))
+            self.epoch, self.step = self._get_saved_model_info(self.args.load_path)
+            self.start_epoch = self.epoch
             logger.info(f"[*] LOADED: {self.args.load_path}")
         else:
             if os.path.exists(os.path.join(self.args.load_path,'checkpoint_tracker.dat')):

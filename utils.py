@@ -81,7 +81,10 @@ def prepare_dirs(args):
             raise Exception(f"Model args.model_name already exits !! give a differnt name")
     else:
         if args.load_path:
-            args.model_dir = args.load_path
+            if args.load_path.endswith(".pth"):
+                args.model_dir = args.load_path.rsplit('/', 1)[0]
+            else:
+                args.model_dir = args.load_path
         else:
             raise Exception("Atleast one of model name or load path should be specified")
 
